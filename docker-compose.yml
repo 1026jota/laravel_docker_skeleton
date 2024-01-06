@@ -1,0 +1,101 @@
+version: '3'
+
+services:
+    app:
+        build:
+            args:
+                DOCKER_WORKING_DIR: ${DOCKER_WORKING_DIR}
+            context: ./
+            dockerfile: ./docker/dockerfile
+        container_name: app
+        restart: unless-stopped
+        working_dir: ${DOCKER_WORKING_DIR}
+        # command: composer i
+        ports:
+            - 9000:9000
+        depends_on:
+            - databaseNoSql
+            - redis
+        networks:
+            - net
+        volumes:
+            - ".:${DOCKER_WORKING_DIR}"
+            - "./docker/php:/usr/local/etc/php"
+
+    database:
+        image: postgres
+        restart: always
+        container_name: postgres
+        environment:
+            POSTGRES_PASSWORD: kredicity
+            POSTGRES_USER: _user
+            POSTGRES_DB: _db
+        networks:
+            - net
+
+    redis:
+        image: redis
+        restart: always
+        container_name: redis
+        ports:
+            - 6379:6379
+        # environment:
+        #     MONGO_INITDB_ROOT_USERNAME: kredicity_admin
+        #     MONGO_INITDB_ROOT_PASSWORD: cExEGw8Mxv58C45WtDjg
+        networks:
+            - net
+
+    databaseNoSql:
+        image: mongo
+        restart: always
+        container_name: mongo
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${DB_USERNAME}
+            MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
+        ports:
+            - 27017:27017
+        networks:
+            - net
+        volumes:
+            - databaseNoSql_volume:/data/db
+
+    nginx:
+        image: nginx:alpine
+        container_name: nginx
+        working_dir: /
+        restart: unless-stopped
+        ports:
+            - 80:80
+            - 443:443
+        networks:
+            - net
+        volumes:
+            - ".:${DOCKER_WORKING_DIR}"
+            - "./docker/nginx:/etc/nginx/conf.d"
+        depends_on:
+            - app
+
+    pm2:
+        build:
+            context: ./
+            dockerfile: ./docker/dockerfile_node
+        container_name: pm2
+        working_dir: /usr/src/app
+        restart: unless-stopped
+        networks:
+            - net
+        ports:
+            - 3000:3000
+        volumes:
+            - ./docker/node:/usr/src/app
+            - ".:${DOCKER_WORKING_DIR}"
+        depends_on:
+            - app
+
+
+networks:
+  net:
+    driver: bridge
+
+volumes:
+  databaseNoSql_volume:

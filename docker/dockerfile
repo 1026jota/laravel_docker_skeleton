@@ -1,0 +1,37 @@
+FROM php:8.2-fpm
+
+ARG DOCKER_WORKING_DIR
+RUN apt-get update
+RUN apt-get install zlib1g-dev libpng-dev unzip curl zip libzip-dev sudo  git \
+        libssl-dev \
+        pkg-config \
+        libcurl4-openssl-dev -y
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install extensions
+RUN docker-php-ext-configure gd && docker-php-ext-install -j$(nproc) gd
+RUN docker-php-ext-install pdo pdo_mysql zip exif pcntl sockets
+RUN docker-php-ext-configure zip
+RUN pecl install mongodb && docker-php-ext-enable mongodb && \
+    pecl install xdebug && docker-php-ext-enable xdebug
+
+RUN docker-php-ext-install pdo
+RUN git clone https://github.com/phpredis/phpredis.git /usr/src/php/ext/redis
+RUN docker-php-ext-install redis
+
+# Install composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+RUN composer config --global github-oauth.github.com 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
+
+RUN chown -R www-data:www-data /var/www/html
+RUN chmod 755 /var/www/html
+RUN echo
+
+COPY . .
+RUN chown www-data:www-data -R ./storage
+
+# Expose port 9000 and start php-fpm server
+CMD [ "php-fpm" ]
